@@ -95,30 +95,32 @@ after_initialize do
     module ::AlternativePassword
         def confirm_password?(password)
             return true if super
-            return false unless self.custom_fields.has_key?('import_pass')
+            return false unless self.custom_fields.has_key?('import_password')
 
-            if AlternativePassword::check_all(password, self.custom_fields['import_pass'])
+            if AlternativePassword::check_all(password, self.custom_fields['import_password'],self.custom_fields['import_salt'])
                 self.password = password
-                self.custom_fields.delete('import_pass')
+                self.custom_fields.delete('import_password')
+                self.custom_fields.delete('import_salt')
                 return save
             end
             false
         end
  
         def self.check_all(password, crypted_pass)
-            AlternativePassword::check_vbulletin(password, crypted_pass) ||
-            AlternativePassword::check_vbulletin5(password, crypted_pass) ||
-            AlternativePassword::check_ipb(password, crypted_pass) ||
-            AlternativePassword::check_smf(password, crypted_pass) ||
-            AlternativePassword::check_md5(password, crypted_pass) ||
-            AlternativePassword::check_bcrypt(password, crypted_pass) ||
-            AlternativePassword::check_sha256(password, crypted_pass) ||
-            AlternativePassword::check_wordpress(password, crypted_pass) ||
-            AlternativePassword::check_wbblite(password, crypted_pass) ||
-            AlternativePassword::check_unixcrypt(password, crypted_pass)
+            AlternativePassword::check_vbulletin(password, crypted_pass, import_salt)
+         #||
+            #AlternativePassword::check_vbulletin5(password, crypted_pass, import_salt) ||
+            #AlternativePassword::check_ipb(password, crypted_pass, import_salt) ||
+            #AlternativePassword::check_smf(password, crypted_pass, import_salt) ||
+            #AlternativePassword::check_md5(password, crypted_pass, import_salt) ||
+            #AlternativePassword::check_bcrypt(password, crypted_pass, import_salt) ||
+            #AlternativePassword::check_sha256(password, crypted_pass, import_salt) ||
+            #AlternativePassword::check_wordpress(password, crypted_pass, import_salt) ||
+            #AlternativePassword::check_wbblite(password, crypted_pass, import_salt) ||
+            #AlternativePassword::check_unixcrypt(password, crypted_pass, import_salt)
         end
 
-        def self.check_bcrypt(password, crypted_pass)
+        def self.check_bcrypt(password, crypted_pass, import_salt)
             begin
               # allow salt:hash as well as hash
               BCrypt::Password.new(crypted_pass.rpartition(':').last) == password
@@ -127,12 +129,12 @@ after_initialize do
             end
         end
 
-        def self.check_vbulletin(password, crypted_pass)
-            hash, salt = crypted_pass.split(':', 2)
+        def self.check_vbulletin(password, crypted_pass, import_salt)
+            hash, salt = crypted_pass, import_salt
             !salt.nil? && hash == Digest::MD5.hexdigest(Digest::MD5.hexdigest(password) + salt)
         end
 
-        def self.check_vbulletin5(password, crypted_pass)
+        def self.check_vbulletin5(password, crypted_pass, import_salt)
             # replace $2y$ with $2a$ see http://stackoverflow.com/a/20981781
             crypted_pass.gsub! /^\$2y\$/, '$2a$'
             begin
@@ -142,42 +144,42 @@ after_initialize do
             end
         end
 
-        def self.check_md5(password, crypted_pass)
+        def self.check_md5(password, crypted_pass, import_salt)
             crypted_pass == Digest::MD5.hexdigest(password)
         end
 
-        def self.check_smf(password, crypted_pass)
+        def self.check_smf(password, crypted_pass, import_salt)
             user, hash = crypted_pass.split(':', 2)
             sha1 = Digest::SHA1.new
             sha1.update user.downcase + password
             hash == sha1.hexdigest
         end
 
-        def self.check_ipb(password, crypted_pass)
+        def self.check_ipb(password, crypted_pass, import_salt)
             # we can't use split since the salts may contain a colon
             salt = crypted_pass.rpartition(':').first
             hash = crypted_pass.rpartition(':').last
             !salt.nil? && hash == Digest::MD5.hexdigest(Digest::MD5.hexdigest(salt) + Digest::MD5.hexdigest(password))
         end
 
-        def self.check_wordpress(password, crypted_pass)
+        def self.check_wordpress(password, crypted_pass, import_salt)
             hasher = WordpressHash.new(8)
             hasher.check(password, crypted_pass.rpartition(':').last)
         end
 
-        def self.check_sha256(password, crypted_pass)
+        def self.check_sha256(password, crypted_pass, import_salt)
             sha256 = Digest::SHA256.new
             sha256.update password
             crypted_pass == sha256.hexdigest
         end
 
-        def self.check_wbblite(password, crypted_pass)
+        def self.check_wbblite(password, crypted_pass, import_salt)
             salt, hash = crypted_pass.split(':', 2)
             sha1 = Digest::SHA1.hexdigest(salt + Digest::SHA1.hexdigest(salt + Digest::SHA1.hexdigest(password)))
             hash == sha1
         end
 
-        def self.check_unixcrypt(password, crypted_pass)
+        def self.check_unixcrypt(password, crypted_pass, import_salt)
             UnixCrypt.valid?(password, crypted_pass)
         end
     end
