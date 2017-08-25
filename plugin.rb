@@ -106,7 +106,7 @@ after_initialize do
             false
         end
  
-        def self.check_all(password, crypted_pass)
+        def self.check_all(password, crypted_pass, import_salt)
             AlternativePassword::check_vbulletin(password, crypted_pass, import_salt)
          #||
             #AlternativePassword::check_vbulletin5(password, crypted_pass, import_salt) ||
